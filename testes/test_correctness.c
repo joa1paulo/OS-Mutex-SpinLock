@@ -45,9 +45,6 @@ int main(void) {
     }
     pt_mutex_destroy(&m);
     pt_spinlock_destroy(&s);
-    
-    int testeEspera;
-    scanf("%d", &testeEspera);
-
+ 
     return fail;
 }
