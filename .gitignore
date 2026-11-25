@@ -54,3 +54,13 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# binários e builds: cada máquina compila o seu
+build/
+*.exe
+*.o
+*.out
+
+# arquivos temporários de teste
+teste*.csv
+__pycache__/
