@@ -1,0 +1,7 @@
+plataforma,secao,cruzamento_threads,razao_1thread,razao_16threads
+linux,curta,6.15,1.849,0.492
+linux,media,9.63,1.01,0.606
+linux,longa,4.12,1.0,0.431
+windows,curta,1.36,1.138,0.507
+windows,media,1.00;7.92,0.999,0.572
+windows,longa,1.35;3.61,0.995,0.495
