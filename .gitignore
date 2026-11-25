@@ -55,8 +55,10 @@ dkms.conf
 # debug information files
 *.dwo
 
-# binários e builds: cada máquina compila o seu
-build/
+# executáveis e objetos: cada máquina compila o seu.
+# A pasta build/ é versionada (só o build/README.md) porque o gcc não a cria sozinho.
+build/*
+!build/README.md
 *.exe
 *.o
 *.out
