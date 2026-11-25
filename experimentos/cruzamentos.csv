@@ -1,7 +1,7 @@
-plataforma,secao,cruzamento_threads,razao_1thread,razao_16threads
-linux,curta,6.15,1.849,0.492
-linux,media,9.63,1.01,0.606
-linux,longa,4.12,1.0,0.431
-windows,curta,1.36,1.138,0.507
-windows,media,1.00;7.92,0.999,0.572
-windows,longa,1.35;3.61,0.995,0.495
+plataforma,secao,regime_por_N,inversao_entre_N,cruzamento_threads,spinlock_perde_a_partir_de_N,razao_1thread,razao_16threads
+linux,curta,1:S 2:S 4:S 8:M 16:M,4-8,6.15,8,1.849,0.492
+linux,media,1:= 2:S 4:S 8:S 16:M,8-16,9.63,16,1.01,0.606
+linux,longa,1:= 2:= 4:= 8:M 16:M,nenhuma,nenhum,8,1.0,0.431
+windows,curta,1:S 2:M 4:M 8:M 16:M,1-2,1.36,2,1.138,0.507
+windows,media,1:= 2:S 4:S 8:= 16:M,4-16,8.91,16,0.999,0.572
+windows,longa,1:= 2:= 4:= 8:M 16:M,nenhuma,nenhum,8,0.995,0.495

@@ -92,50 +92,80 @@ def grade(resumo, col, dp, ylabel, titulo, arq):
     plt.close(fig)
 
 
+Z_LIMITE = 2.0       # diferenca maior que 2 erros-padrao => estatisticamente real (~95%)
+EFEITO_MIN = 0.05    # e maior que 5% => relevante na pratica (evita marcar diferencas minimas)
+
+
 def cruzamentos(resumo):
-    """Razao vazao(spinlock)/vazao(mutex) por nº de threads; cruzamento = razao passa por 1."""
-    linhas, razoes = [], {}
+    """Compara spinlock x mutex em cada N.
+
+    Regime por N: S = spinlock melhor, M = mutex melhor, = empate (diferenca das
+    medias menor que 2 erros-padrao ou menor que 5%: indistinguivel do ruido).
+    Inversao = troca de regime entre dois pontos com diferenca significativa;
+    o ponto de cruzamento e interpolado (escala log2 de N) entre esses dois pontos.
+    """
+    linhas, info = [], {}
     for pl in sorted(resumo.plataforma.unique()):
         for sec in SECOES:
             sel = resumo[(resumo.plataforma == pl) & (resumo.secao == sec)]
-            m = sel[sel.primitiva == "mutex"].set_index("threads")["vazao_media"]
-            s = sel[sel.primitiva == "spinlock"].set_index("threads")["vazao_media"]
-            razao = (s / m).dropna().sort_index()
-            razoes[(pl, sec)] = razao
-            x = np.log2(razao.index.values.astype(float))
-            y = razao.values - 1.0
-            cruz = []
-            for k in range(len(x) - 1):
-                if y[k] * y[k + 1] < 0:
-                    t = y[k] / (y[k] - y[k + 1])
-                    cruz.append(2 ** (x[k] + t * (x[k + 1] - x[k])))
+            m = sel[sel.primitiva == "mutex"].set_index("threads")
+            s = sel[sel.primitiva == "spinlock"].set_index("threads")
+            ns = sorted(set(m.index) & set(s.index))
+            razao, regime = [], []
+            for n in ns:
+                dif = s.loc[n, "vazao_media"] - m.loc[n, "vazao_media"]
+                ep = np.sqrt(s.loc[n, "vazao_dp"] ** 2 / s.loc[n, "n"]
+                             + m.loc[n, "vazao_dp"] ** 2 / m.loc[n, "n"])
+                z = dif / ep if ep > 0 else 0.0
+                razao.append(float(s.loc[n, "vazao_media"] / m.loc[n, "vazao_media"]))
+                rel = razao[-1] - 1.0
+                regime.append("S" if z > Z_LIMITE and rel > EFEITO_MIN
+                              else "M" if z < -Z_LIMITE and rel < -EFEITO_MIN else "=")
+            sig = [k for k, g in enumerate(regime) if g != "="]
+            cruz, trechos = [], []
+            for a, b in zip(sig, sig[1:]):
+                if regime[a] != regime[b]:
+                    xa, xb = np.log2(ns[a]), np.log2(ns[b])
+                    ya, yb = razao[a] - 1.0, razao[b] - 1.0
+                    t = ya / (ya - yb)
+                    cruz.append(2 ** (xa + t * (xb - xa)))
+                    trechos.append(f"{ns[a]}-{ns[b]}")
+            perde = next((ns[k] for k in range(len(ns))
+                          if regime[k] == "M" and "S" not in regime[k:]), None)
+            info[(pl, sec)] = (ns, razao, regime, cruz)
             linhas.append({"plataforma": pl, "secao": sec,
+                           "regime_por_N": " ".join(f"{n}:{g}" for n, g in zip(ns, regime)),
+                           "inversao_entre_N": ";".join(trechos) or "nenhuma",
                            "cruzamento_threads": ";".join(f"{c:.2f}" for c in cruz) or "nenhum",
-                           "razao_1thread": round(float(razao.get(1, np.nan)), 3),
-                           "razao_16threads": round(float(razao.get(16, np.nan)), 3)})
-    return pd.DataFrame(linhas), razoes
+                           "spinlock_perde_a_partir_de_N": perde if perde else "nunca",
+                           "razao_1thread": round(razao[0], 3),
+                           "razao_16threads": round(razao[-1], 3)})
+    return pd.DataFrame(linhas), info
 
 
-def grafico_cruzamento(razoes):
-    plats = sorted({pl for pl, _ in razoes})
-    fig, axs = plt.subplots(1, len(plats), figsize=(7 * len(plats), 4.5), squeeze=False)
+def grafico_cruzamento(info):
+    plats = sorted({pl for pl, _ in info})
+    fig, axs = plt.subplots(1, len(plats), figsize=(7 * len(plats), 5), squeeze=False)
     cores = {"curta": "tab:green", "media": "tab:orange", "longa": "tab:purple"}
     for i, pl in enumerate(plats):
         ax = axs[0][i]
         for sec in SECOES:
-            r = razoes[(pl, sec)]
-            ax.plot(r.index, r.values, marker="o", label=f"secao {sec}", color=cores[sec])
-            x = np.log2(r.index.values.astype(float)); y = r.values - 1.0
-            for k in range(len(x) - 1):
-                if y[k] * y[k + 1] < 0:
-                    t = y[k] / (y[k] - y[k + 1])
-                    ax.plot(2 ** (x[k] + t * (x[k + 1] - x[k])), 1.0, "k*", markersize=14)
+            ns, razao, regime, cruz = info[(pl, sec)]
+            ax.plot(ns, razao, marker="o", label=f"secao {sec}", color=cores[sec])
+            for n, r, g in zip(ns, razao, regime):
+                if g == "=":
+                    ax.plot(n, r, "o", markersize=9, markerfacecolor="white",
+                            markeredgecolor=cores[sec])
+            for c in cruz:
+                ax.plot(c, 1.0, "k*", markersize=15)
         ax.axhline(1.0, color="gray", linestyle="--")
         ax.set_yscale("log")
         ax.set_title(f"{pl}: vazao spinlock / vazao mutex")
         ax.set_ylabel("razao (>1: spinlock melhor)")
         eixo_threads(ax)
         ax.legend()
+    fig.suptitle("estrela = inversao real | circulo vazado = sem diferenca significativa "
+                 "(< 2 erros-padrao ou < 5%)")
     fig.tight_layout()
     fig.savefig(SAIDA / "grafico2_cruzamento.png", dpi=150)
     plt.close(fig)
@@ -150,10 +180,10 @@ def main():
           "Vazao x numero de threads", "grafico1_vazao.png")
     grade(resumo, "tempo_medio", "tempo_dp", "tempo total (s)",
           "Tempo total x numero de threads", "grafico3_tempo.png")
-    tab, razoes = cruzamentos(resumo)
+    tab, info = cruzamentos(resumo)
     tab.to_csv(SAIDA / "cruzamentos.csv", index=False)
-    grafico_cruzamento(razoes)
-    print("\nCruzamentos (estrela = razao passa por 1):")
+    grafico_cruzamento(info)
+    print("\nInversoes spinlock x mutex (S=spinlock melhor, M=mutex melhor, ==empate):")
     print(tab.to_string(index=False))
     print("\nArquivos gerados em", SAIDA)
 
