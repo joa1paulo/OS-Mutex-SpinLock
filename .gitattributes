@@ -1,0 +1,2 @@
+# dados brutos: nunca converter quebras de linha (LF/CRLF)
+dados/*.csv -text
