@@ -120,9 +120,6 @@ python experimentos/gerar_graficos.py
 - O spinlock só compensa, em geral, com seção curta ou média e N ≤ número de CPUs (4); com 8 e 16 threads ele perde e fica muito mais instável.
 - A diferença entre Linux e Windows concentra-se na seção curta: o spinlock perde a vantagem com 2 threads no Windows e só entre 4 e 8 threads no Linux.
 
-## Vídeo
-A FAZER.............
-
 ## Limitações
 
 Uma máquina de 4 CPUs sem SMT; spinlock do Windows próprio (o do Linux é o do glibc); sem afinidade de CPU; uso de CPU não medido; total de aquisições diferente por duração de seção. Lista completa no relatório (seção 6).
